@@ -3,12 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tech Recommendation Guide Generator</title>
-    <script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
+    <title>DF Guide Generator</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.ckeditor.com/4.20.0/standard/ckeditor.js"></script>
   </head>
   <body>
     <h1>DF Guide Generator</h1>
+
+    <!-- Input Section -->
     <label for="topic">Topic: </label>
     <input
       type="text"
@@ -19,14 +21,16 @@
     <input type="number" id="entries" placeholder="E.g., 3" min="1" />
     <button onclick="generateContent()">Generate</button>
 
+    <!-- Generated Content Section -->
     <div id="generatedContent" class="hidden">
       <h2>Generated Content</h2>
-      <button onclick="copyToClipboard()">Copy HTML</button>
-      <br /><br />
       <textarea id="editor"></textarea>
+      <button onclick="copyToClipboard()">Copy HTML</button>
+      <button onclick="copyToClipboardRaw()">Copy raw HTML</button>
     </div>
 
     <script>
+      // Function to generate HTML content based on user input
       function generateContent() {
         const topic = document.getElementById("topic").value;
         const entries = parseInt(document.getElementById("entries").value) || 0;
@@ -39,15 +43,15 @@
         const title = `Best ${topic}`;
         let html = `<h1>${title}</h1>\n<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>\n<ul>`;
 
-        // Table of contents generation
+        // Table of contents with internal links
         for (let i = 1; i <= entries; i++) {
           const entryId = `entry${i}`;
           html += `<li><a href="#${entryId}">Entry ${i}</a></li>`;
         }
 
-        html += `</ul>\n<fragment slug="primis-df" />\n`; // Add <fragment slug="primis-df" />
+        html += `</ul>\n<fragment id="primis-df" />\n`; // Add <fragment id="primis-df" />
 
-        // Entry generation with corresponding <h2> tags having id attributes
+        // Generate entries with <h2> tags having id attributes
         for (let i = 1; i <= entries; i++) {
           const entryId = `entry${i}`;
           html += `<hr />\n<table>\n<tr>\n<td>\n<h2 id="${entryId}">Best ${topic} ${i}</h2>\n<p><em>Subtitle for ${topic} ${i}</em></p>\n</td>\n<td>\n<ul>\n`;
@@ -60,20 +64,67 @@
 
         html += `<poll />\n`; // Add <poll /> at the end
 
-        // Reveal the editor and add the HTML to CKEditor
+        // Initialize CKEditor content
         document.getElementById("generatedContent").classList.remove("hidden");
-
-        if (!CKEDITOR.instances.editor) {
-          CKEDITOR.replace("editor");
-        }
-
-        const editor = CKEDITOR.instances.editor;
+        const editor =
+          CKEDITOR.instances.editor ||
+          CKEDITOR.replace("editor", {
+            extraAllowedContent: "fragment[*]{*}; poll[*]{*}; h2[id]",
+            allowedContent: true,
+          });
         editor.setData(html);
       }
 
+      function copyToClipboardRaw() {
+        const topic = document.getElementById("topic").value;
+        const entries = parseInt(document.getElementById("entries").value) || 0;
+
+        if (!topic || entries < 1) {
+          alert("Please provide a valid topic and number of entries.");
+          return;
+        }
+
+        let html = `<h1>Best ${topic}</h1>\n<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>\n<ul>`;
+
+        for (let i = 1; i <= entries; i++) {
+          html += `<li><a href="#entry${i}">Entry ${i}</a></li>`;
+        }
+
+        html += `</ul>\n<fragment slug="primis-df" />\n`;
+
+        for (let i = 1; i <= entries; i++) {
+          html += `<hr />\n<table>\n<tr>\n<td>\n<h2 id="entry${i}">Best ${topic} ${i}</h2>\n<p><em>Subtitle for ${topic} ${i}</em></p>\n</td>\n<td>\n<ul>\n`;
+          html += `<li><strong><a href="https://example.com/amazon-uk-${i}" rel="sponsored">Check price on Amazon UK</a></strong></li>\n`;
+          html += `<li><strong><a href="https://example.com/amazon-us-${i}" rel="sponsored">Check price on Amazon US</a></strong></li>\n`;
+          html += `</ul>\n</td>\n</tr>\n</table>\n`;
+          html += `<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>\n`;
+          html += `<ul>\n<li><strong>Pro:</strong> Advantage 1</li>\n<li><strong>Pro:</strong> Advantage 2</li>\n<li><strong>Con:</strong> Disadvantage 1</li>\n</ul>\n`;
+        }
+
+        html += `<poll />\n`;
+
+        // Copy raw HTML to clipboard
+        navigator.clipboard
+          .writeText(html)
+          .then(() => {
+            alert("Raw HTML copied to clipboard!");
+          })
+          .catch((err) => {
+            console.error("Could not copy text: ", err);
+          });
+      }
+
+      // Function to copy HTML content to clipboard
       function copyToClipboard() {
         const editor = CKEDITOR.instances.editor;
-        const html = editor.getData();
+        let html = editor.getData();
+
+        // Post-process to fix self-closing tags
+        html = html.replace(/<fragment([^>]*)><\/fragment>/g, "<fragment$1 />");
+        html = html.replace(/<poll([^>]*)><\/poll>/g, "<poll$1 />");
+
+        // Ensure no unwanted nesting of tags
+        html = html.replace(/<\/poll><\/fragment>/g, "</poll>\n</fragment>");
 
         navigator.clipboard
           .writeText(html)
